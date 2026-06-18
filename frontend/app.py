@@ -1,4 +1,6 @@
 import streamlit as st
+st.set_page_config(page_title="Fact-Check Agent", page_icon="🕵️", layout="wide")
+
 import time
 import pandas as pd
 import plotly.express as px
@@ -9,8 +11,6 @@ import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from frontend.utils.api import upload_document, get_status, get_report
-st.set_page_config(page_title="Fact-Check Agent", page_icon="🕵️", layout="wide")
-
 st.title("🕵️ Fact-Check Agent Web App")
 st.markdown("Automatically extract and verify claims from your documents using AI and live web search. Specifically designed to handle **Trap Documents** with outdated statistics or fabricated claims.")
 
@@ -74,7 +74,8 @@ if 'job_id' in st.session_state:
         col4.metric("❌ False", report_data['false_count'])
         
         # Donut Chart
-        if report_data['total_claims'] > 0:
+        total_valid_counts = report_data['verified_count'] + report_data['inaccurate_count'] + report_data['false_count']
+        if total_valid_counts > 0:
             df_status = pd.DataFrame({
                 'Status': ['Verified', 'Inaccurate', 'False'],
                 'Count': [report_data['verified_count'], report_data['inaccurate_count'], report_data['false_count']]
@@ -82,23 +83,39 @@ if 'job_id' in st.session_state:
             fig = px.pie(df_status, values='Count', names='Status', hole=0.5, 
                          color='Status', color_discrete_map={'Verified':'green', 'Inaccurate':'orange', 'False':'red'})
             st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("No claims have been fully verified or refuted yet (all are currently Unverified).")
             
-            # Claims Table
-            st.subheader("Extracted Claims & Evidence")
+        # Claims Table
+        st.subheader("Extracted Claims & Evidence")
+        
+        for claim in report_data['claims']:
+            orig = claim['original_claim']
+            status_desc = ""
+            status_color = ""
+            if claim['status'] == "VERIFIED":
+                status_desc = "Verified (matches data)"
+                status_color = "🟢"
+            elif claim['status'] == "INACCURATE":
+                status_desc = "Inaccurate (e.g., outdated stats)"
+                status_color = "🟠"
+            elif claim['status'] == "FALSE":
+                status_desc = "False (no evidence found)"
+                status_color = "🔴"
+            else:
+                status_desc = claim['status']
+                status_color = "⚪"
             
-            for claim in report_data['claims']:
-                orig = claim['original_claim']
-                status_color = "🟢" if claim['status'] == "VERIFIED" else "🟠" if claim['status'] == "INACCURATE" else "🔴"
+            with st.expander(f"{status_color} {orig['claim_text']} [{status_desc}]"):
+                st.markdown(f"**Type:** {orig['claim_type']} | **Entities:** {', '.join(orig['entities'])} | **Year:** {orig['year'] or 'N/A'}")
+                st.markdown(f"**Confidence Score:** {claim['confidence_score']}")
+                if claim['correct_value']:
+                    st.markdown(f"**Correct Value:** `{claim['correct_value']}`")
+                st.markdown(f"**Explanation:** {claim['explanation']}")
                 
-                with st.expander(f"{status_color} {orig['claim_text']} [{claim['status']}]"):
-                    st.markdown(f"**Type:** {orig['claim_type']} | **Entities:** {', '.join(orig['entities'])} | **Year:** {orig['year'] or 'N/A'}")
-                    st.markdown(f"**Confidence Score:** {claim['confidence_score']}")
-                    if claim['correct_value']:
-                        st.markdown(f"**Correct Value:** `{claim['correct_value']}`")
-                    st.markdown(f"**Explanation:** {claim['explanation']}")
-                    
-                    if claim['evidence_sources']:
-                        st.markdown("### Evidence Sources")
-                        for ev in claim['evidence_sources']:
-                            st.markdown(f"- [{ev['source_title']}]({ev['source_url']}) (Score: {ev['credibility_score']})")
-                            st.caption(f'"{ev["content_snippet"]}"')
+                if claim['evidence_sources']:
+                    st.markdown("### Evidence Sources")
+                    for ev in claim['evidence_sources']:
+                        st.markdown(f"- [{ev['source_title']}]({ev['source_url']}) (Score: {ev['credibility_score']})")
+                        st.caption(f'"{ev["content_snippet"]}"')
+

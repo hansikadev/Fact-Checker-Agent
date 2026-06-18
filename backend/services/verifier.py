@@ -1,16 +1,22 @@
 import os
 import json
 from tavily import TavilyClient
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from backend.models.schemas import ExtractedClaim, VerificationResult, ClaimStatus, Evidence
 
-MODEL_NAME = "gemini-1.5-pro"
+MODEL_NAME = "gemini-3.5-flash"
 
 def search_for_evidence(query: str) -> list[Evidence]:
     tavily_api_key = os.environ.get("TAVILY_API_KEY")
     if not tavily_api_key or tavily_api_key == "your_tavily_api_key_here":
         print("Warning: Missing Tavily API Key. Returning mock evidence.")
-        return []
+        return [Evidence(
+            source_url="https://example.com/mock",
+            source_title="Mock Source Evidence",
+            content_snippet="This is a mock snippet used for testing.",
+            credibility_score=0.85
+        )]
         
     try:
         tavily_client = TavilyClient(api_key=tavily_api_key)
@@ -37,10 +43,10 @@ def verify_claim(claim: ExtractedClaim) -> VerificationResult:
     if not evidences:
         return VerificationResult(
             original_claim=claim,
-            status=ClaimStatus.UNVERIFIED,
+            status=ClaimStatus.FALSE,
             confidence_score=0.0,
             evidence_sources=[],
-            explanation="Could not find external evidence to verify this claim."
+            explanation="False (no evidence found)."
         )
     
     # 2. Evaluate with LLM to handle Trap Document logic
@@ -57,7 +63,7 @@ def verify_claim(claim: ExtractedClaim) -> VerificationResult:
             explanation="Mock explanation due to missing API key."
         )
 
-    genai.configure(api_key=api_key)
+    client = genai.Client(api_key=api_key)
     evidence_text = "\n\n".join([f"Source: {e.source_url}\nDate: {e.publication_date}\nContent: {e.content_snippet}" for e in evidences])
     
     prompt = f"""
@@ -83,10 +89,10 @@ def verify_claim(claim: ExtractedClaim) -> VerificationResult:
     """
     
     try:
-        model = genai.GenerativeModel(MODEL_NAME)
-        response = model.generate_content(
-            prompt,
-            generation_config=genai.GenerationConfig(
+        response = client.models.generate_content(
+            model=MODEL_NAME,
+            contents=prompt,
+            config=types.GenerateContentConfig(
                 response_mime_type="application/json"
             )
         )

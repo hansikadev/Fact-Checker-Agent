@@ -1,10 +1,11 @@
 import os
 import json
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from backend.models.schemas import ExtractedClaim
 
 # Using recommended models, gemini-1.5-pro or 2.0-pro depending on availability.
-MODEL_NAME = "gemini-1.5-pro" 
+MODEL_NAME = "gemini-3.5-flash" 
 
 def extract_claims_from_text(text: str) -> list[ExtractedClaim]:
     api_key = os.environ.get("GEMINI_API_KEY")
@@ -15,7 +16,7 @@ def extract_claims_from_text(text: str) -> list[ExtractedClaim]:
             ExtractedClaim(claim_text="In 2025, over 99.8% of all Fortune 500 CEOs were replaced by artificial intelligence agents.", claim_type="Statistic", entities=["Fortune 500", "AI"], year="2025")
         ]
         
-    genai.configure(api_key=api_key)
+    client = genai.Client(api_key=api_key)
     prompt = f"""
     You are an expert data extractor and fact checker. 
     Analyze the following text and extract all quantitative claims, statistics, percentages, 
@@ -35,10 +36,10 @@ def extract_claims_from_text(text: str) -> list[ExtractedClaim]:
     """
     
     try:
-        model = genai.GenerativeModel(MODEL_NAME)
-        response = model.generate_content(
-            prompt,
-            generation_config=genai.GenerationConfig(
+        response = client.models.generate_content(
+            model=MODEL_NAME,
+            contents=prompt,
+            config=types.GenerateContentConfig(
                 response_mime_type="application/json"
             )
         )
