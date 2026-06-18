@@ -11,7 +11,7 @@ def extract_claims_from_text(text: str) -> list[ExtractedClaim]:
     if not api_key or api_key == "your_gemini_api_key_here":
         print("Warning: Missing Gemini API Key. Returning mock claims.")
         return [
-            ExtractedClaim(claim_text="The Earth revolves around the Sun.", claim_type="Fact", entities=["Earth", "Sun"]),
+            ExtractedClaim(claim_text="The Earth revolves around the Sun.", claim_type="Quantitative", entities=["Earth", "Sun"]),
             ExtractedClaim(claim_text="In 2025, over 99.8% of all Fortune 500 CEOs were replaced by artificial intelligence agents.", claim_type="Statistic", entities=["Fortune 500", "AI"], year="2025")
         ]
         
